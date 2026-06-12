@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Dev Rules"
+  short_description: "Backend project development rules"
+  default_prompt: "Use $backend-dev-rules to follow the backend project development rules while implementing changes."
