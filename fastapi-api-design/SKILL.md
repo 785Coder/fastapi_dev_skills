@@ -1,18 +1,18 @@
 ---
 name: fastapi-api-design
-description: FastAPI 接口设计规范：RESTful 请求方式、动作词路径、禁用路径参数和 query 参数、body 传参、Pydantic schema 复用、前端迁移文档同步。
+description: FastAPI 接口设计规范：RESTful 请求方式、动作词路径、按 HTTP 方法区分 query/body 传参、Pydantic schema 复用、前端迁移文档同步。
 ---
 
 # FastAPI API Design
 
-用于在 FastAPI 项目中设计、重构或评审接口时，保持接口风格一致，特别适用于本项目这类需要“动作词路径 + RESTful 请求方式 + body 传参”的后端接口。
+用于在 FastAPI 项目中设计、重构或评审接口时，保持接口风格一致，特别适用于本项目这类需要”动作词路径 + RESTful 请求方式 + 按 HTTP 方法选择 query/body 传参”的后端接口。
 
 ## 何时使用
 
 - 新增 FastAPI 接口。
 - 重构已有接口路径、请求方式或请求体。
-- 将路径参数迁移到 body。
-- 禁用 query 参数，改为 body 传参。
+- 将路径参数迁移到 query 或 body。
+- GET / DELETE 使用 query 传参，POST / PUT / PATCH 使用 body 传参。
 - 为前端输出接口迁移文档。
 - 检查接口是否符合当前项目约定。
 
@@ -54,7 +54,7 @@ POST   /experts/reset-password
 
 注意：动作词路径不代表所有请求都使用 `POST`。路径负责表达业务动作，HTTP 方法负责表达操作语义。
 
-### 3. 移除路径参数，使用 body 传递
+### 3. 移除路径参数
 
 不要使用：
 
@@ -67,72 +67,85 @@ DELETE /experts/{expert_id}
 改为：
 
 ```http
-GET    /experts/get
+GET    /experts/get?expert_id=expert_2064000000000000001
 PUT    /experts/update
-DELETE /experts/delete
-```
-
-请求 body 示例：
-
-```json
-{
-  "expert_id": "expert_2064000000000000001"
-}
+DELETE /experts/delete?expert_id=expert_2064000000000000001
 ```
 
 FastAPI 写法示例：
+
+```python
+from fastapi import Query
+
+@router.get("/get")
+async def get_expert(expert_id: str = Query(...)):
+    ...
+
+@router.delete("/delete")
+async def delete_expert(expert_id: str = Query(...)):
+    ...
+```
+
+### 4. 按 HTTP 方法区分 query / body 传参
+
+遵循 HTTP 规范，避免 nginx 和标准 HTTP 实现无法识别 `GET` / `DELETE` 请求 body 的问题。
+
+| HTTP 方法 | 传参方式 | 说明 |
+|-----------|----------|------|
+| `GET` | query | 获取信息，参数放在 URL 中 |
+| `DELETE` | query | 删除信息，参数放在 URL 中 |
+| `POST` | body | 创建资源或动作型接口 |
+| `PUT` | body | 全量更新资源 |
+| `PATCH` | body | 部分更新资源 |
+
+#### GET / DELETE 示例（query 传参）
+
+```http
+GET /experts/list?page_no=1&page_size=20
+DELETE /experts/delete?expert_id=expert_2064000000000000001
+```
+
+FastAPI 写法：
+
+```python
+from fastapi import Query
+
+@router.get("/list")
+async def list_experts(
+    page_no: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    ...
+
+@router.delete("/delete")
+async def delete_expert(expert_id: str = Query(...)):
+    ...
+```
+
+#### POST / PUT / PATCH 示例（body 传参）
+
+```http
+POST /experts/create
+Content-Type: application/json
+
+{
+  "name": "张三",
+  "title": "教授"
+}
+```
+
+FastAPI 写法：
 
 ```python
 from fastapi import Body
 
-@router.get("/get")
-async def get_expert(expert_id: str = Body(..., embed=True)):
+@router.post("/create")
+async def create_expert(data: ExpertCreate):
     ...
 
-@router.delete("/delete")
-async def delete_expert(expert_id: str = Body(..., embed=True)):
+@router.put("/update")
+async def update_expert(data: ExpertUpdate):
     ...
-```
-
-### 4. 禁用 query 参数，只能使用 body 传参
-
-对于当前约定下的接口，不要通过 query 传业务参数或分页参数。
-
-不要使用：
-
-```http
-GET /experts/list?page_no=1&page_size=20
-```
-
-应使用：
-
-```http
-GET /experts/list
-Content-Type: application/json
-
-{
-  "page_no": 1,
-  "page_size": 20
-}
-```
-
-FastAPI 写法示例：
-
-```python
-@router.get("/list")
-async def list_experts(
-    page_no: int = Body(1, ge=1),
-    page_size: int = Body(20, ge=1, le=100),
-):
-    ...
-```
-
-前端如使用 Axios，请通过 `config.data` 给 `GET` / `DELETE` 传 body：
-
-```ts
-request.get('/experts/list', { data: { page_no, page_size } });
-request.get('/experts/get', { data: { expert_id } });
-request.delete('/experts/delete', { data: { expert_id } });
 ```
 
 ### 5. 不要使用裸 `dict` 接收请求体
@@ -203,6 +216,8 @@ PasswordReset
 ## 推荐 FastAPI 路由模板
 
 ```python
+from fastapi import Query, Body
+
 @router.post("/create", response_model=ResponseWrapper[ExpertProfile])
 async def create_expert(data: ExpertCreate):
     ...
@@ -210,14 +225,14 @@ async def create_expert(data: ExpertCreate):
 
 @router.get("/list", response_model=ResponseWrapper[PaginatedData[ExpertListItem]])
 async def list_experts(
-    page_no: int = Body(1, ge=1),
-    page_size: int = Body(20, ge=1, le=100),
+    page_no: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
 ):
     ...
 
 
 @router.get("/get", response_model=ResponseWrapper[ExpertProfile])
-async def get_expert(expert_id: str = Body(..., embed=True)):
+async def get_expert(expert_id: str = Query(...)):
     ...
 
 
@@ -227,7 +242,7 @@ async def update_expert(data: ExpertUpdate):
 
 
 @router.delete("/delete", response_model=ResponseWrapper[None])
-async def delete_expert(expert_id: str = Body(..., embed=True)):
+async def delete_expert(expert_id: str = Query(...)):
     ...
 
 
@@ -242,21 +257,20 @@ async def reset_password(data: PasswordReset):
 
 1. 接口清单。
 2. 旧接口到新接口对照表。
-3. 请求方法、路径、body 参数。
+3. 请求方法、路径、传参方式（query / body）。
 4. TypeScript interface。
 5. 前端封装示例。
-6. 明确标注：不使用 query、不使用路径参数。
-7. 如果 `GET` / `DELETE` 需要 body，说明 Axios 使用 `config.data`。
+6. 明确标注：不使用路径参数；`GET` / `DELETE` 使用 query，`POST` / `PUT` / `PATCH` 使用 body。
 
 前端封装示例：
 
 ```ts
 export async function listExperts(page_no = 1, page_size = 20) {
-  return request.get('/experts/list', { data: { page_no, page_size } });
+  return request.get('/experts/list', { params: { page_no, page_size } });
 }
 
 export async function getExpert(expert_id: string) {
-  return request.get('/experts/get', { data: { expert_id } });
+  return request.get('/experts/get', { params: { expert_id } });
 }
 
 export async function updateExpert(data: ExpertUpdate) {
@@ -264,7 +278,7 @@ export async function updateExpert(data: ExpertUpdate) {
 }
 
 export async function deleteExpert(expert_id: string) {
-  return request.delete('/experts/delete', { data: { expert_id } });
+  return request.delete('/experts/delete', { params: { expert_id } });
 }
 ```
 
@@ -272,12 +286,13 @@ export async function deleteExpert(expert_id: string) {
 
 完成接口修改后逐项检查：
 
-- [ ] 获取接口使用 `GET`。
-- [ ] 删除接口使用 `DELETE`。
-- [ ] 更新接口使用 `PUT`。
-- [ ] 创建和动作型接口使用 `POST`。
+- [ ] 获取接口使用 `GET`，传参使用 query。
+- [ ] 删除接口使用 `DELETE`，传参使用 query。
+- [ ] 更新接口使用 `PUT`，传参使用 body。
+- [ ] 创建和动作型接口使用 `POST`，传参使用 body。
 - [ ] 没有路径参数，例如 `/{id}`、`/{expert_id}`。
-- [ ] 没有 query 参数承载业务参数或分页参数。
+- [ ] `GET` / `DELETE` 不使用 body 传参。
+- [ ] `POST` / `PUT` / `PATCH` 不使用 query 传参。
 - [ ] 没有使用裸 `dict` 接收请求体。
 - [ ] 没有新增不必要的 `*Body` 包装 schema。
 - [ ] 新增字段优先合入原业务 schema。
