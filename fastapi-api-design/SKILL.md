@@ -5,7 +5,7 @@ description: FastAPI 接口设计规范：RESTful 请求方式、动作词路径
 
 # FastAPI API Design
 
-用于在 FastAPI 项目中设计、重构或评审接口时，保持接口风格一致，特别适用于本项目这类需要”动作词路径 + RESTful 请求方式 + 按 HTTP 方法选择 query/body 传参”的后端接口。
+用于在 FastAPI 项目中设计、重构或评审接口时，保持接口风格一致，特别适用于本项目这类需要"动作词路径 + RESTful 请求方式 + 按 HTTP 方法选择 query/body 传参"的后端接口。
 
 ## 何时使用
 
@@ -54,35 +54,47 @@ POST   /experts/reset-password
 
 注意：动作词路径不代表所有请求都使用 `POST`。路径负责表达业务动作，HTTP 方法负责表达操作语义。
 
-### 3. 移除路径参数
+### 3. 严禁使用路径参数（Path Parameter）
 
-不要使用：
+**严禁在接口路径中使用 `{param}` 形式的路径参数。**
+
+无论是什么场景、什么 HTTP 方法，一律禁止使用路径参数。
 
 ```http
-GET /experts/{expert_id}
-PUT /experts/{expert_id}
+// ❌ 严禁使用 — 路径参数
+GET    /experts/{expert_id}
+PUT    /experts/{expert_id}
 DELETE /experts/{expert_id}
-```
+POST   /experts/{expert_id}/reset-password
 
-改为：
-
-```http
+// ✅ 正确做法 — 使用 query 或 body 传参
 GET    /experts/get?expert_id=expert_2064000000000000001
 PUT    /experts/update
 DELETE /experts/delete?expert_id=expert_2064000000000000001
+POST   /experts/reset-password
 ```
 
-FastAPI 写法示例：
+#### 为什么严禁路径参数
+
+1. **路由冲突风险**：`GET /experts/{id}` 与 `GET /experts/list` 在部分框架/网关下可能产生解析歧义。
+2. **缓存不可控**：路径参数导致同一接口的不同请求生成不同 URL，CDN/浏览器缓存策略失效。
+3. **前端对接不统一**：query/body 传参可以统一封装拦截器，路径参数需要特殊处理。
+4. **批量操作困难**：路径参数天然不支持批量操作，query/body 可以传数组或逗号分隔 ID。
+5. **日志与监控复杂**：路径参数使同一接口的 URL 形态多样，增加日志聚合和链路追踪难度。
+
+#### FastAPI 正确写法
 
 ```python
 from fastapi import Query
 
-@router.get("/get")
-async def get_expert(expert_id: str = Query(...)):
+// ❌ 严禁
+@router.get("/{expert_id}")
+async def get_expert(expert_id: str):
     ...
 
-@router.delete("/delete")
-async def delete_expert(expert_id: str = Query(...)):
+// ✅ 正确
+@router.get("/get")
+async def get_expert(expert_id: str = Query(...)):
     ...
 ```
 
@@ -286,11 +298,11 @@ export async function deleteExpert(expert_id: string) {
 
 完成接口修改后逐项检查：
 
+- [ ] **严禁路径参数**：所有接口路径中不存在 `{param}` 形式的路径参数。
 - [ ] 获取接口使用 `GET`，传参使用 query。
 - [ ] 删除接口使用 `DELETE`，传参使用 query。
 - [ ] 更新接口使用 `PUT`，传参使用 body。
 - [ ] 创建和动作型接口使用 `POST`，传参使用 body。
-- [ ] 没有路径参数，例如 `/{id}`、`/{expert_id}`。
 - [ ] `GET` / `DELETE` 不使用 body 传参。
 - [ ] `POST` / `PUT` / `PATCH` 不使用 query 传参。
 - [ ] 没有使用裸 `dict` 接收请求体。
