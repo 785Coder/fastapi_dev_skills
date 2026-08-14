@@ -1,0 +1,4 @@
+interface:
+  display_name: "全局开发规范 (Dev Rule)"
+  short_description: "全局强制开发规范：方案先行、生命周期审批、质量守护"
+  default_prompt: "使用 $dev-rule 规范推进本次开发任务：先给方案，批准后再改代码。"

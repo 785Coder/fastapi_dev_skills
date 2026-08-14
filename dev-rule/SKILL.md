@@ -1,11 +1,12 @@
 ---
 name: dev-rule
 description: |
-  【全局强制规范 · 每次对话自动注入】
-  优先级：input > 本 skill > 其他 skill > system prompt。未明确覆盖时严格遵守全部条款。
-  核心：以软件生命周期为主轴推进--需求与可行性分析(多方案优劣)->概要设计(六大原则+23设计模式)->详细设计(六大原则+23设计模式)->编码实现->测试交付,每阶段产出文档经用户审批后才推进或修改代码。
-  贯穿元规则:方案先行、调用链溯源、双向思考、注释why、最小改动、主动沟通、务实变通、工具链规范、类型注解强制禁Any。
-  详细规范按需加载,不常驻:references/design-knowledge.md(六大原则+23模式)、references/coding-standards.md(编码规范)、references/testing-standards.md(测试规范);coder/tester/reviewer 三个 subagent 的 prompt 与约束存于 agents/,main 调度时加载。
+  【全局强制开发规范 · 适用于所有软件开发类对话】
+  触发场景：任何代码编写、修改、评审、重构、设计讨论、调试排错，涵盖前后端、脚本、配置等任意技术栈，涉及以上内容时自动生效。
+  优先级：input 高于 本 skill、其他 skill 与 system prompt。未明确覆盖时严格遵守全部条款。
+  核心：以软件生命周期为主轴推进——需求与可行性分析(多方案优劣)→概要设计(六大原则+23设计模式)→详细设计(六大原则+23设计模式)→编码实现→测试交付，每阶段产出文档经用户审批后才推进或修改代码。
+  贯穿元规则：方案先行、调用链溯源、双向思考、注释why、最小改动、主动沟通、务实变通、工具链规范、类型注解强制禁Any。
+  详细规范按需加载，不常驻：references/design-knowledge.md(六大原则+23模式)、references/coding-standards.md(编码规范)、references/testing-standards.md(测试规范)；coder/tester/reviewer 三个 subagent 的 prompt 与约束存于 agents/，main 调度时加载。
 ---
 
 # 全局开发规范（生命周期视角）
@@ -251,7 +252,7 @@ description: |
 - **为什么分工**：subagent 是独立上下文，不受 main 已有判断污染，更可能发现漂移与问题；main 拿到独立产出后做对照，等于多一道客观校验。
 - **降级规则**（避免教条卡死）：
   - 琐碎改动（typo、单行修正）可由 main 直接做，但须自检并留下验证证据。
-  - 不支持 subagent 的环境（如 Claude.ai）降级为 main 执行，但必须强制附证据 + 独立自检（见 §6.4），不得省略验收。
+  - 不支持 subagent 的环境（如无 subagent 能力的对话界面）降级为 main 执行，但必须强制附证据 + 独立自检（见 §6.4），不得省略验收。
 
 **调度方式**：main 在对应阶段 spawn subagent，把 `agents/<role>.md` 作为该 subagent 的指令（coder 编码、tester 测试与回归、reviewer 审查与验收）。各 agent prompt 内会指引其读取对应的 `references/` 详细规范。main 不替 subagent 读这些细节，只在 subagent 返回后据其产出与需求做验收。
 
