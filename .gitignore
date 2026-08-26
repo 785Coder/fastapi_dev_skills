@@ -1,0 +1,5 @@
+# 忽略所有 arkcli 开头的文件夹
+arkcli*/
+# 忽略所有 byted 开头的文件夹
+byted*/
+
