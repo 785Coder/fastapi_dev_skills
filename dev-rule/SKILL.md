@@ -234,7 +234,7 @@ description: |
 测试详细规范（测试脚本规范、逻辑 bug 固化与回归）独立存于 `references/testing-standards.md`。**测试编写与回归交 tester subagent**（其 prompt 与约束见 `agents/tester.md`），执行前必读该文件。要点：
 
 - 函数级与复杂测试统一固化到项目 `tests/`，不只在对话里 inline 跑。
-- 用户报告的逻辑 bug：编回归脚本入 `tests/` + 固化到 `docs/bug-regression.md`。
+- 用户报告的逻辑 bug：编回归脚本入 `tests/` + 按类别固化到 `docs/bugs/`（每个 bug 一个文件，见 references/testing-standards.md §5.4）。
 - 每次改动后跑相关回归测试，确认未触发旧 bug；回归失败必报告。
 
 ---
@@ -363,7 +363,7 @@ description: |
 - [ ] 修改后逐条对照需求自检，未发生逻辑漂移。
 - [ ] 已声明预期改动/实际改动/是否触及预期外代码/副作用；逻辑 bug 已主动报告未隐瞒。
 - [ ] "已修复/无问题"声明均附测试或验证证据；review subagent 独立审查通过；被质疑时先验证再回应。
-- [ ] 用户报告的逻辑 bug 已编回归测试脚本（tests/）并固化到 docs/bug-regression.md。
+- [ ] 用户报告的逻辑 bug 已编回归测试脚本（tests/）并按类别固化到 docs/bugs/（每个 bug 一个文件，含现象/根因/回归用例位置）。
 - [ ] 修改后跑回归测试未触发旧 bug；验收四项（符合需求/无副作用/测试通过/回归通过）均过。
 
 ### 沟通与变通
